@@ -26,10 +26,23 @@ export function initializeCases(db) {
     CREATE TABLE IF NOT EXISTS history (
       id INTEGER PRIMARY KEY, case_id INTEGER NOT NULL REFERENCES cases(id),
       author_id INTEGER NOT NULL REFERENCES users(id), timestamp TEXT NOT NULL,
-      description TEXT NOT NULL
+      description TEXT NOT NULL, author_name TEXT NOT NULL
     );
     CREATE INDEX IF NOT EXISTS history_case ON history(case_id);
   `);
+  db.exec('BEGIN IMMEDIATE');
+  try {
+    if (!db.prepare("PRAGMA table_info('history')").all().some(column => column.name === 'author_name')) {
+      db.exec(`
+        ALTER TABLE history ADD COLUMN author_name TEXT NOT NULL DEFAULT '';
+        UPDATE history SET author_name = (SELECT name FROM users WHERE id = author_id);
+      `);
+    }
+    db.exec('COMMIT');
+  } catch (error) {
+    db.exec('ROLLBACK');
+    throw error;
+  }
 }
 
 export function field(value, label, limit, required = false) {
@@ -59,7 +72,7 @@ export function createClient(db, data) {
 export function options(db) {
   return {
     clients: db.prepare('SELECT * FROM clients ORDER BY name COLLATE NOCASE').all(),
-    users: db.prepare('SELECT id, username, name FROM users ORDER BY name, id').all(),
+    users: db.prepare('SELECT id, name FROM users ORDER BY name, id').all(),
   };
 }
 
@@ -96,8 +109,8 @@ export function caseFields(db, data) {
 }
 
 function record(db, id, author, timestamp, description) {
-  db.prepare('INSERT INTO history (case_id, author_id, timestamp, description) VALUES (?, ?, ?, ?)')
-    .run(id, author, timestamp, description);
+  db.prepare('INSERT INTO history (case_id, author_id, timestamp, description, author_name) VALUES (?, ?, ?, ?, (SELECT name FROM users WHERE id = ?))')
+    .run(id, author, timestamp, description, author);
 }
 
 function changedFields(before, after, fields) {
@@ -159,8 +172,8 @@ export function detail(db, id) {
     const row = getCase(db, id);
     const actions = actionsFor(db, id);
     const history = db.prepare(`
-      SELECT history.id, timestamp, description, users.name AS author, users.username
-      FROM history JOIN users ON users.id = author_id WHERE case_id = ? ORDER BY history.id DESC
+      SELECT id, timestamp, description, author_name AS author
+      FROM history WHERE case_id = ? ORDER BY history.id DESC
     `).all(id);
     return { ...row, actions, history, next: nextAction(row, actions) };
   });

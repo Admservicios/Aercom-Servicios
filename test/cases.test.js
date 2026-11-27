@@ -1,18 +1,18 @@
 import assert from 'node:assert/strict';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { test } from 'node:test';
-import { openDatabase, initializeAccounts } from '../db.js';
-import { createAccount } from '../auth.js';
+import { openDatabase, initializePeople } from '../db.js';
+import { addPerson } from '../identity.js';
 import { actionsFor, saveAction, updateCase, createCase, createClient, getCase, initializeCases, listCases } from '../cases.js';
 
 test('base de casos vacía y alta mínima con clasificación del cliente', t => {
   const dir = mkdtempSync('/tmp/aercom-cases-');
   const db = openDatabase(dir + '/test.sqlite');
   t.after(() => { db.close(); rmSync(dir, { recursive: true, force: true }); });
-  initializeAccounts(db);
+  initializePeople(db);
   initializeCases(db);
   assert.deepEqual(listCases(db), []);
-  createAccount(db, 'ana', 'Ana', 'clave temporal 1');
+  addPerson(db, 'Ana');
   assert.throws(() => createCase(db, { subject: 'Visita' }), { status: 400 });
   for (const kind of ['Abonado', 'Tercero']) {
     const client = createClient(db, { name: kind + ' de prueba', kind });
@@ -30,9 +30,9 @@ test('acciones independientes, asignación posterior, factura y cierre', t => {
   const dir = mkdtempSync('/tmp/aercom-actions-');
   const db = openDatabase(dir + '/test.sqlite');
   t.after(() => { db.close(); rmSync(dir, { recursive: true, force: true }); });
-  initializeAccounts(db);
+  initializePeople(db);
   initializeCases(db);
-  createAccount(db, 'ana', 'Ana', 'clave temporal 1');
+  addPerson(db, 'Ana');
   const client = createClient(db, { name: 'Cliente', kind: 'Tercero' });
   const data = { client_id: client.id, subject: 'Servicio' };
   const { id } = createCase(db, data, 1);

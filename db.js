@@ -11,15 +11,35 @@ export function openDatabase(path = databasePath()) {
   return db;
 }
 
-export function initializeAccounts(db) {
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS users (
-      id INTEGER PRIMARY KEY, username TEXT NOT NULL UNIQUE COLLATE NOCASE,
-      name TEXT NOT NULL, password TEXT NOT NULL
-    );
-    CREATE TABLE IF NOT EXISTS sessions (
-      token TEXT PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users(id),
-      expires INTEGER NOT NULL
-    );
-  `);
+const usersSchema = `CREATE TABLE IF NOT EXISTS users (
+  id INTEGER PRIMARY KEY, name TEXT NOT NULL
+)`;
+
+export function initializePeople(db) {
+  db.exec('PRAGMA foreign_keys = OFF; BEGIN IMMEDIATE');
+  try {
+    db.exec(usersSchema);
+    if (db.prepare("PRAGMA table_info('users')").all().some(column => column.name === 'password')) {
+      db.exec(`
+        DROP TABLE IF EXISTS sessions;
+        ${usersSchema.replace('EXISTS users', 'EXISTS people_migration')};
+        INSERT INTO people_migration (id, name) SELECT id, name FROM users;
+        DROP TABLE users;
+        ALTER TABLE people_migration RENAME TO users;
+      `);
+    }
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS sessions (
+        token TEXT PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users(id),
+        expires INTEGER NOT NULL
+      );
+    `);
+    if (db.prepare('PRAGMA foreign_key_check').get()) throw new Error('La base tiene referencias inválidas.');
+    db.exec('COMMIT');
+  } catch (error) {
+    db.exec('ROLLBACK');
+    throw error;
+  } finally {
+    db.exec('PRAGMA foreign_keys = ON');
+  }
 }

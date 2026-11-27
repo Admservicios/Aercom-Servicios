@@ -25,7 +25,14 @@ h3{font-size:15px;margin-bottom:6px}
 .page-head p{margin:0}
 .panel{background:#fff;border:1px solid var(--line);border-radius:11px;padding:20px;margin-bottom:16px}
 .narrow{max-width:710px}
-.login{max-width:410px;margin:36px auto}
+.picker{max-width:485px;margin:36px auto;padding:26px}
+.person-list{display:grid;gap:8px;margin:18px 0}
+.person-list button{justify-content:space-between;text-align:left;padding:12px 14px;background:#f5faf8}
+.person-list button span{color:var(--accent)}
+.picker-controls{margin-top:14px}
+dialog{width:min(485px,calc(100vw - 28px));padding:0;border:0;border-radius:11px}
+dialog .picker{margin:0}
+dialog::backdrop{background:#12343e90}
 label{display:grid;gap:6px;font-weight:650;align-self:start}
 input,select,textarea,button,.button{font:inherit;border-radius:6px;border:1px solid #aebec3;padding:9px 11px}
 input,select,textarea{width:100%;background:#fff;color:#202e37;min-width:0}

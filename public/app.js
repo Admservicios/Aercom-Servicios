@@ -1,6 +1,7 @@
 const page = document.querySelector('#page');
 const nav = document.querySelector('#nav');
 const account = document.querySelector('#account');
+let activePerson;
 const path = location.pathname;
 const id = /^\/casos\/(\d+)$/.exec(path)?.[1];
 const escapeHtml = value => String(value ?? '').replace(/[&<>"']/g, char =>
@@ -9,7 +10,7 @@ const escapeHtml = value => String(value ?? '').replace(/[&<>"']/g, char =>
 async function api(path, method = 'GET', data) {
   const response = await fetch('/api/' + path, {
     method,
-    ...(data ? { body: JSON.stringify(data), headers: { 'Content-Type': 'application/json' } } : {}),
+    ...(data ? { body: JSON.stringify(data), headers: { 'Content-Type': 'application/json', 'X-Aercom-Person': String(activePerson?.id ?? '') } } : {}),
   });
   const result = await response.json();
   if (!response.ok) throw Object.assign(new Error(result.error), { status: response.status });
@@ -35,15 +36,46 @@ function bindForm(form, save) {
 
 const submit = text => `<p class="error" role="alert"></p><div class="buttons"><button class="primary" type="submit">${text}</button></div>`;
 
-function login() {
-  page.innerHTML = `<section class="panel login"><h1>Ingresar</h1>
-    <form class="fields"><label>Usuario<input name="username" autocomplete="username" required></label>
-    <label>Contraseña<input type="password" name="password" autocomplete="current-password" required></label>
-    ${submit('Ingresar')}</form></section>`;
-  bindForm(page.querySelector('form'), async data => {
-    await api('login', 'POST', data);
-    location.reload();
-  });
+async function choosePerson({ changing = false } = {}) {
+  const people = await api('people');
+  const picker = document.createElement('section');
+  picker.className = 'panel picker';
+  picker.innerHTML = `<h1>${changing ? 'Cambiar nombre' : 'Elegí tu nombre'}</h1>
+    <p class="muted">${people.length ? 'El historial registra los cambios con el nombre que elijas.' :
+      'La lista está vacía. Pedile a Sistemas que cargue los nombres del equipo.'}</p>
+    <div class="person-list">${people.map(person => `<button type="button" data-person="${person.id}"
+      ${person.id === activePerson?.id ? 'disabled' : ''}>${escapeHtml(person.name)}
+      ${person.id === activePerson?.id ? '<small>Activo</small>' : '<span aria-hidden="true">→</span>'}</button>`).join('')}</div>
+    <p class="error" role="alert"></p>
+    ${changing ? '<div class="buttons picker-controls"><button type="button" data-cancel>Cancelar</button><button type="button" data-clear>Quitar selección</button></div>' : ''}`;
+  function bind(button, route, data) {
+    button.onclick = async () => {
+      const enabled = [...picker.querySelectorAll('button:not(:disabled)')];
+      enabled.forEach(control => { control.disabled = true; });
+      try {
+        await api(route, 'POST', data);
+        location.reload();
+      } catch (error) {
+        picker.querySelector('.error').textContent = error.message;
+        enabled.forEach(control => { control.disabled = false; });
+      }
+    };
+  }
+  for (const button of picker.querySelectorAll('[data-person]')) {
+    bind(button, 'selection', { person_id: Number(button.dataset.person) });
+  }
+  if (changing) {
+    const dialog = document.createElement('dialog');
+    dialog.setAttribute('aria-label', 'Cambiar nombre');
+    dialog.append(picker);
+    picker.querySelector('[data-cancel]').onclick = () => dialog.close();
+    bind(picker.querySelector('[data-clear]'), 'clear-selection', {});
+    dialog.addEventListener('close', () => dialog.remove(), { once: true });
+    document.body.append(dialog);
+    dialog.showModal();
+  } else {
+    page.replaceChildren(picker);
+  }
 }
 
 function heading(title, subtitle, button = '') {
@@ -55,7 +87,7 @@ const formatter = new Intl.DateTimeFormat('es-AR', { dateStyle: 'short', timeSty
 const displayDate = date => date ? formatter.format(new Date(date)) : '—';
 const selectOptions = (rows, value, label) => rows.map(row =>
   `<option value="${row.id}" ${row.id === Number(value) ? 'selected' : ''}>${h(label(row))}</option>`).join('');
-const userOptions = (users, value) => selectOptions(users, value, row => `${row.name} (@${row.username})`);
+const userOptions = (users, value) => selectOptions(users, value, row => row.name);
 const clientOptions = (clients, value) => selectOptions(clients, value, row => `${row.name} · ${row.kind}`);
 
 function poll(refresh, status) {
@@ -68,7 +100,7 @@ function poll(refresh, status) {
       status.hidden = true;
     } catch (error) {
       status.textContent = error.status === 401
-        ? 'La sesión venció. Volvé a ingresar en otra pestaña para conservar tu edición.'
+        ? 'La selección venció. Elegí tu nombre en otra pestaña para conservar tu edición.'
         : 'No se pudo actualizar. Reintentando…';
       status.hidden = false;
     } finally { running = false; }
@@ -169,7 +201,7 @@ function actionCard(action, choices, closed) {
 
 function historyEntries(history) {
   return `<ol class="timeline">${history.map(entry => `<li>
-    <strong>${h(entry.author)}</strong> <small>@${h(entry.username)} · ${displayDate(entry.timestamp)}</small>
+    <strong>${h(entry.author)}</strong> <small>${displayDate(entry.timestamp)}</small>
     <div>${h(entry.description)}</div></li>`).join('')}</ol>`;
 }
 
@@ -253,16 +285,21 @@ async function detailPage() {
 }
 
 async function start() {
-  let user;
-  try { user = await api('me'); }
+  try { activePerson = await api('me'); }
   catch (error) {
-    if (error.status === 401) return login();
+    if (error.status === 401) return choosePerson();
     throw error;
   }
   nav.hidden = account.hidden = false;
-  document.querySelector('#identity').textContent = user.name;
+  document.querySelector('#identity').textContent = activePerson.name;
   nav.querySelector(path === '/nuevo' ? 'a:last-child' : 'a:first-child').setAttribute('aria-current', 'page');
-  document.querySelector('#logout').onclick = async () => { await api('logout', 'POST', {}); location.reload(); };
+  const change = document.querySelector('#change-person');
+  change.onclick = async () => {
+    change.disabled = true;
+    try { await choosePerson({ changing: true }); }
+    catch (error) { document.querySelector('#identity-error').textContent = error.message; }
+    finally { change.disabled = false; }
+  };
   if (path === '/nuevo') await newPage();
   else if (id) await detailPage();
   else await casesPage();

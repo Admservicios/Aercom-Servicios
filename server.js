@@ -1,8 +1,8 @@
 import { createServer } from 'node:http';
 import { readFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
-import { initializeAccounts, openDatabase } from './db.js';
-import { sessionCookie, sessionUser, signIn, signOut } from './auth.js';
+import { initializePeople, openDatabase } from './db.js';
+import { sessionCookie, sessionUser, people, selectPerson, clearSelection } from './identity.js';
 
 import { HttpError, initializeCases, options, createClient, listCases, detail, createCase, updateCase, saveAction, actionKinds, actionStatuses } from './cases.js';
 
@@ -33,7 +33,7 @@ async function readJson(req) {
 
 export function createApp(path) {
   const db = openDatabase(path);
-  initializeAccounts(db);
+  initializePeople(db);
   initializeCases(db);
   const server = createServer(async (req, res) => {
     res.setHeader('Cache-Control', 'no-store');
@@ -54,20 +54,24 @@ export function createApp(path) {
       if (req.headers['sec-fetch-site'] === 'cross-site') throw new HttpError(403, 'Solicitud externa.');
       const token = req.headers.cookie?.match(/(?:^|;\s*)aercom_session=([a-f0-9]{64})(?:;|$)/)?.[1];
       const user = token && sessionUser(db, token);
-      if (req.method === 'POST' && pathname === '/api/login') {
+      if (req.method === 'GET' && pathname === '/api/people') return json(200, people(db));
+      if (req.method === 'POST' && pathname === '/api/selection') {
         const data = await readJson(req);
-        const signed = signIn(db, data.username, data.password);
-        if (!signed) throw new HttpError(401, 'Usuario o contraseña incorrectos.');
-        res.setHeader('Set-Cookie', sessionCookie(signed));
-        return json(200, sessionUser(db, signed));
+        const selected = selectPerson(db, data.person_id, token);
+        if (!selected) throw new HttpError(400, 'Elegí un nombre de la lista.');
+        res.setHeader('Set-Cookie', sessionCookie(selected.token));
+        return json(200, selected.person);
       }
-      if (!user) throw new HttpError(401, 'Ingresá con tu cuenta.');
+      if (!user) throw new HttpError(401, 'Elegí tu nombre para continuar.');
       if (req.method === 'GET' && pathname === '/api/me') return json(200, user);
-      if (req.method === 'POST' && pathname === '/api/logout') {
+      if (req.method === 'POST' && pathname === '/api/clear-selection') {
         await readJson(req);
-        signOut(db, token);
+        clearSelection(db, token);
         res.setHeader('Set-Cookie', sessionCookie(''));
         return json(200, {});
+      }
+      if (req.method !== 'GET' && req.headers['x-aercom-person'] !== String(user.id)) {
+        throw new HttpError(409, 'El nombre activo cambió en otra pestaña. Verificá el nombre antes de guardar.');
       }
       if (req.method === 'GET' && pathname === '/api/options') return json(200, { ...options(db), actionKinds, actionStatuses });
       if (req.method === 'POST' && pathname === '/api/clients') return json(201, createClient(db, await readJson(req)));

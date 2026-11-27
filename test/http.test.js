@@ -4,7 +4,7 @@ import { test } from 'node:test';
 import { spawnSync } from 'node:child_process';
 import { createApp } from '../server.js';
 import { openDatabase } from '../db.js';
-import { createAccount } from '../auth.js';
+import { addPerson } from '../identity.js';
 
 test('API compartida, conflictos, reinicio y restauración de un respaldo', async t => {
   const dir = mkdtempSync('/tmp/aercom-http-');
@@ -22,21 +22,27 @@ test('API compartida, conflictos, reinicio y restauración de un respaldo', asyn
   t.after(async () => { await stop(); rmSync(dir, { recursive: true, force: true }); });
   await start();
   const db = openDatabase(path);
-  createAccount(db, 'ana', 'Ana', 'clave temporal 1');
-  createAccount(db, 'luis', 'Luis', 'clave temporal 2');
+  addPerson(db, 'Ana');
+  addPerson(db, 'Luis');
   db.close();
 
-  async function request(route, { cookie, method = 'GET', data } = {}) {
+  const selection = new Map();
+  async function request(route, { cookie, person, method = 'GET', data } = {}) {
     const response = await fetch(base + '/api/' + route, {
-      method, headers: { ...(cookie ? { Cookie: cookie } : {}), ...(data ? { 'Content-Type': 'application/json' } : {}) },
+      method, headers: { ...(cookie ? { Cookie: cookie, 'X-Aercom-Person': String(person ?? selection.get(cookie)) } : {}), ...(data ? { 'Content-Type': 'application/json' } : {}) },
       body: data ? JSON.stringify(data) : undefined,
     });
-    return { status: response.status, body: await response.json(), cookie: response.headers.get('set-cookie')?.split(';')[0] };
+    const issued = response.headers.get('set-cookie')?.split(';')[0];
+    if (issued && route === 'selection') selection.set(issued, data.person_id);
+    return { status: response.status, body: await response.json(), cookie: issued };
   }
 
   assert.equal((await request('cases')).status, 401);
-  const ana = (await request('login', { method: 'POST', data: { username: 'ana', password: 'clave temporal 1' } })).cookie;
-  const luis = (await request('login', { method: 'POST', data: { username: 'luis', password: 'clave temporal 2' } })).cookie;
+  const ana = (await request('selection', { method: 'POST', data: { person_id: 1 } })).cookie;
+  const luis = (await request('selection', { method: 'POST', data: { person_id: 2 } })).cookie;
+  assert.equal((await request('selection', { method: 'POST', data: { person_id: 999 } })).status, 400);
+  assert.deepEqual((await request('people')).body, [{ id: 1, name: 'Ana' }, { id: 2, name: 'Luis' }]);
+  assert.equal((await request('clients', { method: 'POST', cookie: ana, person: 2, data: { name: 'Otra pestaña', kind: 'Tercero' } })).status, 409);
   const client = (await request('clients', { cookie: ana, method: 'POST', data: { name: 'Planta Norte', kind: 'Abonado' } })).body;
   const data = { client_id: client.id, subject: 'Bomba', owner_id: 2, author_id: 2 };
   const created = await request('cases', { cookie: ana, method: 'POST', data });
@@ -72,7 +78,7 @@ test('API compartida, conflictos, reinicio y restauración de un respaldo', asyn
   copyFileSync(backupPath, restored);
   await stop();
   await start(restored);
-  const restoredLogin = await request('login', { method: 'POST', data: { username: 'ana', password: 'clave temporal 1' } });
+  const restoredLogin = await request('selection', { method: 'POST', data: { person_id: 1 } });
   assert.equal(restoredLogin.status, 200);
   assert.deepEqual((await request(route, { cookie: restoredLogin.cookie })).body, detail);
 });
