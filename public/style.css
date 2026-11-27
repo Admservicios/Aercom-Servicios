@@ -1,0 +1,67 @@
+:root{font-family:Inter,system-ui,sans-serif;color:#202e37;background:#f2f5f6;font-size:14px;--line:#dbe4e7;--ink:#153541;--muted:#4f6770;--accent:#006454}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{margin:0}
+a{color:var(--accent);text-decoration:none}
+a:hover{text-decoration:underline}
+.top{background:#12343e;color:#fff;border-bottom:3px solid #36ad98}
+.top-inner{max-width:1280px;margin:auto;display:flex;gap:34px;align-items:center;padding:0 32px;min-height:66px;flex-wrap:wrap}
+.brand{color:#fff;font-size:19px;font-weight:750;display:flex;gap:7px;align-items:center}
+.brand span:last-child{color:#aee7dc;font-weight:500}
+.mark{display:grid;place-items:center;background:#d9f7ef;color:#144739;width:31px;height:31px;border-radius:8px;margin-right:4px;font-weight:850}
+nav,.account,.toolbar,.buttons,.page-head,.section-head{display:flex;align-items:center;gap:12px}
+nav a{color:#e4f3f3;padding:9px 13px;border-radius:6px}
+nav a[aria-current=page]{background:#28505a}
+.account{margin-left:auto;color:#dbeaea}
+.quiet{background:transparent;color:inherit;border-color:currentColor}
+main{max-width:1280px;margin:auto;padding:32px}
+h1,h2,h3,p{margin-top:0}
+h1{font-size:34px;letter-spacing:-.035em;margin-bottom:6px;color:var(--ink)}
+h2{font-size:18px;color:var(--ink);margin-bottom:14px}
+h3{font-size:15px;margin-bottom:6px}
+.page-head,.section-head{justify-content:space-between;flex-wrap:wrap}
+.page-head{margin-bottom:22px}
+.page-head p,.muted{color:var(--muted)}
+.page-head p{margin:0}
+.panel{background:#fff;border:1px solid var(--line);border-radius:11px;padding:20px;margin-bottom:16px}
+.narrow{max-width:710px}
+.login{max-width:410px;margin:36px auto}
+label{display:grid;gap:6px;font-weight:650;align-self:start}
+input,select,textarea,button,.button{font:inherit;border-radius:6px;border:1px solid #aebec3;padding:9px 11px}
+input,select,textarea{width:100%;background:#fff;color:#202e37;min-width:0}
+textarea{resize:vertical}
+button,.button{cursor:pointer;display:inline-flex;align-items:center;justify-content:center;font-weight:650;background:#fff;color:var(--ink)}
+.primary{background:var(--accent);color:white;border-color:var(--accent)}
+button:hover,.button:hover{filter:brightness(.94);text-decoration:none}
+:focus-visible{outline:3px solid #38a58f;outline-offset:2px}
+.fields{display:grid;gap:15px}
+.two{grid-template-columns:repeat(2,minmax(0,1fr))}
+.wide{grid-column:1/-1}
+.toolbar{align-items:end;flex-wrap:wrap;margin-bottom:16px}
+.toolbar label:first-child{flex:1;min-width:220px}
+.table-area{overflow-x:auto}
+table{border-collapse:collapse;width:100%;text-align:left}
+th,td{padding:11px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+th{background:#edf3f4;color:#38545e;font-size:12px}
+td a{font-weight:700}
+.badge{display:inline-block;border-radius:20px;background:#e8eff1;color:#314e58;padding:4px 9px;font-size:12px;font-weight:650;white-space:nowrap}
+.badge.open{background:#dff5ed;color:#075647}
+.error{color:#9a2424;font-weight:650;margin:0}
+.notice{color:#664710;background:#fff2d3;border-radius:6px;padding:10px;margin:8px 0}
+.details{display:grid;grid-template-columns:minmax(0,2fr) minmax(260px,1fr);gap:16px;align-items:start}
+.summary{display:flex;gap:15px 26px;flex-wrap:wrap;margin:0}
+.summary div{min-width:110px}
+dt{color:var(--muted);font-size:12px;margin-bottom:4px}dd{margin:0;font-weight:650}
+.timeline{list-style:none;margin:0;padding:0}
+.timeline li{border-top:1px solid var(--line);padding:11px 0}
+.timeline small,.action-meta{color:var(--muted)}
+.action{padding:13px 0;border-top:1px solid var(--line)}
+.action p{margin:7px 0;white-space:pre-wrap;overflow-wrap:anywhere}
+.action form{margin-top:12px}
+details summary{cursor:pointer;color:var(--accent);font-weight:650}
+details[open] summary{margin-bottom:12px}
+@media(max-width:760px){main{padding:20px 14px}.top-inner{padding:10px 14px;gap:8px 14px}.account{margin-left:0}.details,.two{grid-template-columns:1fr}}
+.client-create{border-top:1px solid var(--line);padding-top:15px;margin-top:18px}
+.new-action{margin-bottom:14px}
+.timeline div{margin-top:4px;overflow-wrap:anywhere;white-space:pre-wrap}
+button:disabled{opacity:.65;cursor:wait}
